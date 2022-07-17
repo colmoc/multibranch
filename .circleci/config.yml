@@ -1,18 +1,111 @@
 version: 2.0 # use CircleCI 2.0
 jobs: # a collection of steps  
-  update-green:
-    docker: 
-      - image: circleci/node:10.16.3 
-    steps: 
-      - checkout 
+  build-app:
+    docker:
+      - image: python:3.7.3-stretch
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "requirements.txt" }}
+            - v1-dependencies-
       - run:
-          name: update-green
-          command: echo "I build only for development, green update here"
+          name: install dependencies
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            make install
+            # Install hadolint
+            wget -O /bin/hadolint https://github.com/hadolint/hadolint/releases/download/v1.16.3/hadolint-Linux-x86_64 &&\
+            chmod +x /bin/hadolint
+      - save_cache:
+          paths:
+            - ./venv
+          key: v1-dependencies-{{ checksum "requirements.txt" }}
+      - run:
+          name: run lint
+          command: |
+            . venv/bin/activate
+            make lint
+  upload-docker:
+    docker:
+      - image: cimg/go:1.17
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_PASSWORD
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.14
+      - run:
+          name: Build + Upload Docker
+          command: |
+            TAG=0.1.${CIRCLE_WORKFLOW_ID:0:2}
+            echo $TAG
+            echo $DOCKER_PATH
+            docker build -t $DOCKER_PATH:$TAG .
+            echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            docker push $DOCKER_PATH:$TAG
+          
+  update-green:
+    docker:
+      - image: cimg/go:1.17
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_PASSWORD
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            whoami
+            curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.23.6/bin/linux/amd64/kubectl
+            chmod +x ./kubectl
+            sudo mv ./kubectl /usr/local/bin/kubectl
+            kubectl version --client
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+            aws --version
+      - run:
+          name: Update kubconfig
+          command: |
+            aws eks --region us-east-2 update-kubeconfig --name eks-demo-deployment
+            aws sts get-caller-identity
+            cat ~/.kube/config
+            kubectl get namespace
+      - setup_remote_docker:
+          version: 20.10.14
+      - run:
+          name: Rolling Update on Green
+          command: |
+            TAG=0.1.${CIRCLE_WORKFLOW_ID:0:2}
+            aws eks --region us-east-2 update-kubeconfig --name eks-demo-deployment
+            echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+            dockerpath=$DOCKER_PATH:$TAG
+            kubectl get svc -n=production-green -o wide
+            kubectl get pods -n=production-green -o wide
+            sleep 2
+            kubectl set image deployment/python-housek8s-production-green capapp=$dockerpath -n=production-green
+            sleep 25
+            echo "Updated Image Green"
+            kubectl get svc -n=production-green -o wide
+            kubectl get pods -n=production-green -o wide
+      - run:
+          name: Output URL
+          command: |
+            echo "New URL Green"
+            kubectl get services --namespace production-green --output jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}'
+
 workflows:
   version: 2
   updateGreen:    
     jobs:
+      - build-app 
+      - upload-docker:
+          requires: [build-app]
       - update-green:
+          requires: [upload-docker]
           filters:
             branches:
               only:
