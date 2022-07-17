@@ -1,5 +1,14 @@
 version: 2.0 # use CircleCI 2.0
 jobs: # a collection of steps  
+  testjob:
+    docker: 
+      - image: circleci/node:10.16.3 
+    steps: 
+      - checkout 
+      - run:
+          name: testjob
+          command: echo "do i get called also"
+          
   update-blue:
     docker: 
       - image: circleci/node:10.16.3 
@@ -12,6 +21,7 @@ workflows:
   version: 2
   updateBlue:    
     jobs:
+      - testjob
       - update-blue:
           filters:
             branches:
