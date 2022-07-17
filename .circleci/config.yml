@@ -27,7 +27,7 @@ jobs: # a collection of steps
           command: |
             . venv/bin/activate
             make lint
-    upload-docker:
+  upload-docker:
     docker:
       - image: cimg/go:1.17
         auth:
