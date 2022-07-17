@@ -17,7 +17,7 @@ RUN pip install --upgrade pip &&\
 
 ## Step 4:
 # Expose port 80
-EXPOSE 80
+EXPOS 80
 
 ## Step 5:
 # Run app.py at container launch
