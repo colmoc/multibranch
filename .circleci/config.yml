@@ -60,7 +60,7 @@ workflows:
           requires: [build-app]
       - update-blue:
           requires: [upload-docker]
-            filters:
-              branches:
-                only:
-                  - updateBlue
+          filters:
+            branches:
+              only:
+                - updateBlue
