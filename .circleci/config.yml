@@ -42,6 +42,7 @@ jobs: # a collection of steps
           command: |
             TAG=0.1.${CIRCLE_WORKFLOW_ID:0:2}
             echo $TAG
+            echo $DOCKER_PATH
             docker build -t $DOCKER_PATH:$TAG .
             echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
             docker push $DOCKER_PATH:$TAG
