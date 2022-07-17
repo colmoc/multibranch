@@ -87,13 +87,16 @@ jobs: # a collection of steps
             kubectl get pods -n=production-blue -o wide
             sleep 2
             kubectl set image deployment/python-housek8s-production-blue capapp=$dockerpath -n=production-blue
-            sleep 20
+            sleep 25
             echo "Updated Image Blue"
             kubectl get svc -n=production-blue -o wide
             kubectl get pods -n=production-blue -o wide
-            echo "Non-updated Image Green"
-            kubectl get svc -n=production-green -o wide
-            kubectl get pods -n=production-green -o wide
+      - run:
+          name: Output URL
+          command: |
+            echo "New URL Blue"
+            kubectl get services --namespace production-blue --output jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}'
+
 workflows:
   version: 2
   updateBlue:    
